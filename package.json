@@ -13,7 +13,8 @@
     "test:integration": "NODE_OPTIONS='--experimental-vm-modules' jest tests/integration",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Pre-commit hook — scans staged content for secrets before allowing a commit.
+# Installed via: git config core.hooksPath .githooks
+# To bypass in an emergency: git commit --no-verify (document why in the commit message)
+
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+FAILED=0
+
+# ─── 1. Block staged files that should never be committed ─────────────────────
+
+BLOCKED_PATHS=(
+  "^credentials/"
+  "\.env$"
+)
+
+# Staged files (additions, copies, modifications, renames only — not deletions)
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+for path in $STAGED; do
+  for pattern in "${BLOCKED_PATHS[@]}"; do
+    if echo "$path" | grep -qE "$pattern"; then
+      echo -e "${RED}[secret-scan] BLOCKED: staged file matches sensitive path '$pattern': $path${NC}"
+      FAILED=1
+    fi
+  done
+done
+
+# ─── 2. Scan staged content for secret patterns ───────────────────────────────
+#
+# Each entry is: "LABEL|FLAGS|PATTERN"
+# FLAGS is passed to grep (e.g. "-iE" for case-insensitive extended regex)
+# Uses BSD grep -E (macOS compatible) — no PCRE-only features.
+
+SECRET_PATTERNS=(
+  "Private key PEM header|-E|-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY"
+  "Service account JSON key|-E|\"private_key\"[[:space:]]*:[[:space:]]*\"-----BEGIN"
+  "Service account JSON key ID|-E|\"private_key_id\"[[:space:]]*:[[:space:]]*\"[a-f0-9]{40}\""
+  "Generic high-entropy secret|-iE|(password|passwd|secret|api_key|apikey|auth_token|access_token)[[:space:]]*[:=][[:space:]]*['\"][A-Za-z0-9+/]{20,}['\"]"
+  "Google API key|-E|AIza[0-9A-Za-z_-]{35}"
+  "npm token|-E|npm_[0-9a-zA-Z]{36}"
+)
+
+for path in $STAGED; do
+  # .env.example is expected to have placeholder-shaped values — skip it
+  if [[ "$path" == *".env.example" ]]; then
+    continue
+  fi
+
+  # Read staged content (not working-tree content)
+  content=$(git show ":$path" 2>/dev/null) || continue
+
+  for entry in "${SECRET_PATTERNS[@]}"; do
+    label="${entry%%|*}"
+    rest="${entry#*|}"
+    flags="${rest%%|*}"
+    pattern="${rest#*|}"
+
+    # shellcheck disable=SC2086
+    if echo "$content" | grep -q $flags -e "$pattern" 2>/dev/null; then
+      echo -e "${RED}[secret-scan] BLOCKED: '$label' pattern found in: $path${NC}"
+      FAILED=1
+    fi
+  done
+done
+
+# ─── 3. Warn/block large binary files ─────────────────────────────────────────
+
+LARGE_LIMIT_KB=500
+
+for path in $STAGED; do
+  size=$(git cat-file -s ":$path" 2>/dev/null) || continue
+  size_kb=$(( size / 1024 ))
+  if (( size_kb > LARGE_LIMIT_KB )); then
+    ext="${path##*.}"
+    case "$ext" in
+      gguf|bin|safetensors|pt|ckpt|pkl|model)
+        echo -e "${RED}[secret-scan] BLOCKED: large model/binary file staged (${size_kb}KB): $path${NC}"
+        FAILED=1
+        ;;
+      *)
+        echo -e "${YELLOW}[secret-scan] WARNING: large file staged (${size_kb}KB): $path — confirm intentional${NC}"
+        ;;
+    esac
+  fi
+done
+
+# ─── Result ───────────────────────────────────────────────────────────────────
+
+if (( FAILED )); then
+  echo ""
+  echo -e "${RED}[secret-scan] Commit blocked. Fix the issues above before committing.${NC}"
+  echo "  To bypass in an emergency: git commit --no-verify"
+  echo "  Document the reason in your commit message if you do."
+  exit 1
+fi
+
+exit 0
