@@ -9,6 +9,7 @@ jest.unstable_mockModule('../../src/services/embedding.js', () => ({
   embedText: jest.fn(),
   cosineSimilarity: jest.fn(),
   validateEmbeddingDimensions: jest.fn(),
+  validateFiniteVector: jest.fn(),
   getEmbeddingContext: jest.fn(),
   disposeEmbeddingContext: jest.fn(),
 }));

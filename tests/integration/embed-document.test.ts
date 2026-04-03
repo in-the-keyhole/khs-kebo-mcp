@@ -110,6 +110,7 @@ describe('embedDocument', () => {
     expect(mockGenerateSummary).toHaveBeenCalledWith(
       expect.stringContaining('React'),
       expect.any(Function),
+      expect.any(String),
     );
   });
 });
