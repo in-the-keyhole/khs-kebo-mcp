@@ -4,6 +4,8 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   GOOGLE_SERVICE_ACCOUNT_KEY_PATH: z.string(),
   GOOGLE_DRIVE_FOLDER_ID: z.string().optional(),
+  // Optional: Drive file ID of the SOW template used to structure extraction prompts
+  SCOPE_OF_WORK_TEMPLATE_FILE_ID: z.string().optional(),
 
   // Embedding model — GGUF via HuggingFace
   EMBEDDING_HF_REPO: z.string().default('mixedbread-ai/mxbai-embed-large-v1-GGUF'),

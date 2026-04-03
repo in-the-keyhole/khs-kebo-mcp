@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { generateSummary } from '../services/summarizer.js';
 import { embedText } from '../services/embedding.js';
+import { getSowSections, buildTemplateContext } from '../services/template.js';
 import { documents, documentEmbeddings } from '../db/schema.js';
 import { config } from '../config.js';
 import type { Db } from '../db/client.js';
@@ -25,14 +26,20 @@ export async function embedDocument(documentId: string, db: Db): Promise<EmbedRe
     throw new Error(`Document not found: ${documentId}`);
   }
 
+  // Load SOW template context (cached after first call, gracefully skipped if unset)
+  const sowSections = await getSowSections();
+  const templateContext = buildTemplateContext(sowSections);
+
   // Generate anonymized structured summary via local LLM
-  // We pass a thin generateFn wrapper so the summarizer stays LLM-agnostic
-  const summary = await generateSummary(doc.contentRedacted, async (prompt) => {
-    // getLlamaModel is loaded lazily — only initialises when first called
-    const { getLlamaModel } = await import('../services/llm.js');
-    const model = await getLlamaModel();
-    return model.generate(prompt);
-  });
+  const summary = await generateSummary(
+    doc.contentRedacted,
+    async (prompt) => {
+      const { getLlamaModel } = await import('../services/llm.js');
+      const model = await getLlamaModel();
+      return model.generate(prompt);
+    },
+    templateContext,
+  );
 
   // Build a flat text representation of the summary for embedding
   const summaryText = [

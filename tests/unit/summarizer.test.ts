@@ -77,4 +77,16 @@ describe('buildSummaryPrompt', () => {
     const prompt = buildSummaryPrompt('some text');
     expect(prompt.toLowerCase()).toMatch(/no.*client|client.*name|do not.*identify/);
   });
+
+  it('includes template context when provided', () => {
+    const ctx = 'Technology details are in: "Technical Requirements".';
+    const prompt = buildSummaryPrompt('some text', ctx);
+    expect(prompt).toContain(ctx);
+    expect(prompt).toContain('Document structure guidance');
+  });
+
+  it('omits template section when context is empty string', () => {
+    const prompt = buildSummaryPrompt('some text', '');
+    expect(prompt).not.toContain('Document structure guidance');
+  });
 });

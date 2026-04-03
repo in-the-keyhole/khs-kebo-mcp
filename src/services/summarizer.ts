@@ -17,10 +17,14 @@ const ENGAGEMENT_ALIASES: Record<string, EngagementType> = {
   'managed services': 'support',
 };
 
-export function buildSummaryPrompt(documentText: string): string {
+export function buildSummaryPrompt(documentText: string, templateContext = ''): string {
+  const templateHint = templateContext
+    ? `\n\nDocument structure guidance:\n${templateContext}`
+    : '';
+
   return `You are an analyst extracting anonymized metadata from a client engagement document.
 Do not identify the client by name or reference any individual's name.
-Focus only on: what industry they are in, what technologies they use, their budget scale, cloud infrastructure, and the type of engagement.
+Focus only on: what industry they are in, what technologies they use, their budget scale, cloud infrastructure, and the type of engagement.${templateHint}
 
 Return ONLY a JSON object with these exact fields (no markdown, no explanation):
 {
@@ -114,8 +118,9 @@ function toStringArray(val: unknown): string[] {
 export async function generateSummary(
   text: string,
   generateFn: (prompt: string) => Promise<string>,
+  templateContext = '',
 ): Promise<StructuredSummary> {
-  const prompt = buildSummaryPrompt(text);
+  const prompt = buildSummaryPrompt(text, templateContext);
   const raw = await generateFn(prompt);
   return parseSummaryJson(raw);
 }
