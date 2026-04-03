@@ -13,7 +13,7 @@ An MCP server that ingests Google Drive documents, redacts client identity, gene
 | Decision | Rationale |
 |---|---|
 | stdio MCP transport only | Localhost tool; no multi-tenancy needed |
-| node-llama-cpp for LLM + embeddings | In-process, Metal-accelerated, no Ollama dependency |
+| node-llama-cpp for LLM + embeddings | In-process, Metal-accelerated on Apple Silicon; models downloaded directly from HuggingFace |
 | Drizzle ORM | Lightweight, TypeScript-first, native pgvector support |
 | testcontainers for integration tests | Tests run against real pgvector, not mocks |
 | ESM throughout | `"type": "module"` in package.json; use `.js` extensions in imports |
