@@ -2,12 +2,9 @@
 /**
  * Seed fake SOW documents in Google Drive for testing.
  *
- * Copies the SOW template into the target folder and prepends
- * fake project data so the documents are distinct and searchable.
- *
- * Prerequisites:
- *   Share https://drive.google.com/drive/folders/0ACcvqajavMiEUk9PVA
- *   with kebo-mcp-sources@kebo-mcp-sources.iam.gserviceaccount.com (Editor)
+ * Copies the SOW template into a "Test Scopes" subfolder and replaces
+ * placeholder text with fake project data. Documents are clearly marked
+ * as test data in the title and body.
  *
  * Usage:
  *   tsx scripts/seed-test-scopes.ts
@@ -22,13 +19,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const CREDENTIALS_PATH = resolve(__dirname, '../credentials/kebo-mcp-sources-12c5559e4e03.json');
-const TARGET_FOLDER_ID = '0ACcvqajavMiEUk9PVA';
+const SHARED_DRIVE_ID = '0ACcvqajavMiEUk9PVA';
 const TEMPLATE_FILE_ID = '1ROPUlWf27LJEF_E7gnmon4u5xqt0w5lWMLlQpLW2rGQ';
+const TEST_FOLDER_NAME = 'Test Scopes';
 
 interface FakeScope {
-  title: string;
-  client: string;
+  projectName: string;
+  companyName: string;
   industry: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  salesName: string;
+  date: string;
   description: string;
   technologies: string[];
   budget: string;
@@ -37,9 +40,14 @@ interface FakeScope {
 
 const FAKE_SCOPES: FakeScope[] = [
   {
-    title: 'Acme Manufacturing – Digital Transformation Portal',
-    client: 'Acme Manufacturing Co.',
+    projectName: 'Digital Transformation Portal',
+    companyName: 'Acme Manufacturing Co.',
     industry: 'Manufacturing',
+    contactName: 'Sandra Ortega',
+    contactEmail: 'sortega@acmemfg.example.com',
+    contactPhone: '816-555-0142',
+    salesName: 'Jordan Reeves',
+    date: 'February 3, 2025',
     description:
       'Modernize a legacy ERP integration layer with a cloud-native API gateway and React-based operator dashboard. Keyhole will deliver a new data pipeline from on-prem SCADA systems to AWS, plus a real-time dashboard for plant floor operators.',
     technologies: ['React', 'Node.js', 'PostgreSQL', 'AWS ECS', 'Terraform'],
@@ -47,9 +55,14 @@ const FAKE_SCOPES: FakeScope[] = [
     timeline: '6 months',
   },
   {
-    title: 'TechFlow Health – Patient Analytics Dashboard',
-    client: 'TechFlow Health Systems',
+    projectName: 'Patient Analytics Dashboard',
+    companyName: 'TechFlow Health Systems',
     industry: 'Healthcare',
+    contactName: 'Dr. Marcus Webb',
+    contactEmail: 'mwebb@techflowhealth.example.com',
+    contactPhone: '913-555-0278',
+    salesName: 'Priya Nair',
+    date: 'April 11, 2025',
     description:
       'Build a clinical outcomes analytics platform that ingests HL7 FHIR data from three hospital EMR systems and surfaces actionable insights to nursing and administrative staff via a secure web portal.',
     technologies: ['Python', 'FastAPI', 'Snowflake', 'Azure', 'Power BI Embedded'],
@@ -57,9 +70,14 @@ const FAKE_SCOPES: FakeScope[] = [
     timeline: '4 months',
   },
   {
-    title: 'Bridgeport Financial – Loan Origination Automation',
-    client: 'Bridgeport Financial Group',
+    projectName: 'Loan Origination Automation',
+    companyName: 'Bridgeport Financial Group',
     industry: 'Financial Services',
+    contactName: 'Teresa Hamlin',
+    contactEmail: 'thamlin@bridgeportfg.example.com',
+    contactPhone: '312-555-0391',
+    salesName: 'Jordan Reeves',
+    date: 'July 22, 2025',
     description:
       'Automate the end-to-end consumer loan origination workflow by replacing a paper-based approval process with a BPMN workflow engine, reducing time-to-decision from 5 business days to under 4 hours.',
     technologies: ['Java', 'Spring Boot', 'PostgreSQL', 'Camunda BPM', 'GCP Cloud Run'],
@@ -67,9 +85,14 @@ const FAKE_SCOPES: FakeScope[] = [
     timeline: '8 months',
   },
   {
-    title: 'RetailPlex – Inventory Optimization Engine',
-    client: 'RetailPlex Inc.',
+    projectName: 'Inventory Optimization Engine',
+    companyName: 'RetailPlex Inc.',
     industry: 'Retail / E-Commerce',
+    contactName: 'Kevin Ashford',
+    contactEmail: 'kashford@retailplex.example.com',
+    contactPhone: '720-555-0517',
+    salesName: 'Priya Nair',
+    date: 'September 5, 2025',
     description:
       'Implement a real-time inventory forecasting service that integrates POS data from 120 retail locations with supplier inventory APIs to reduce stockouts by an estimated 35%.',
     technologies: ['Python', 'Apache Kafka', 'Elasticsearch', 'AWS Lambda', 'Next.js'],
@@ -77,9 +100,14 @@ const FAKE_SCOPES: FakeScope[] = [
     timeline: '5 months',
   },
   {
-    title: 'CivicBridge – Permit Management Modernization',
-    client: 'CivicBridge Municipal Services',
+    projectName: 'Permit Management Modernization',
+    companyName: 'CivicBridge Municipal Services',
     industry: 'Government / Public Sector',
+    contactName: 'Diane Kowalski',
+    contactEmail: 'dkowalski@civicbridge.example.gov',
+    contactPhone: '405-555-0663',
+    salesName: 'Jordan Reeves',
+    date: 'November 14, 2025',
     description:
       'Replace a 15-year-old permitting system with a citizen-facing web portal, an internal staff workflow engine, and integration with the county GIS layer for parcel-level tracking.',
     technologies: ['Vue.js', '.NET 8', 'SQL Server', 'Azure App Service', 'ArcGIS REST API'],
@@ -87,41 +115,51 @@ const FAKE_SCOPES: FakeScope[] = [
     timeline: '9 months',
   },
   {
-    title: 'Horizon Logistics – Fleet Telematics Platform',
-    client: 'Horizon Logistics LLC',
+    projectName: 'Fleet Telematics Platform',
+    companyName: 'Horizon Logistics LLC',
     industry: 'Transportation & Logistics',
+    contactName: 'Ray Thornton',
+    contactEmail: 'rthornton@horizonlogistics.example.com',
+    contactPhone: '214-555-0784',
+    salesName: 'Priya Nair',
+    date: 'January 9, 2026',
     description:
-      'Design and build a telematics data platform that collects GPS/CAN-bus data from 800 long-haul trucks, processes events in near-real time, and exposes a driver-facing mobile app and dispatcher web console.',
+      'Design and build a telematics data platform that collects GPS and CAN-bus data from 800 long-haul trucks, processes events in near-real time, and exposes a driver-facing mobile app and dispatcher web console.',
     technologies: ['React Native', 'Go', 'TimescaleDB', 'Kafka', 'AWS IoT Core'],
     budget: '$410,000',
     timeline: '10 months',
   },
 ];
 
-function buildDocHeader(scope: FakeScope): string {
-  const lines = [
-    `[TEST DATA — generated by seed-test-scopes.ts]`,
-    ``,
-    `Client: ${scope.client}`,
-    `Industry: ${scope.industry}`,
-    `Project: ${scope.title}`,
-    ``,
-    `Project Overview`,
-    scope.description,
-    ``,
-    `Proposed Technology Stack`,
-    scope.technologies.join(', '),
-    ``,
-    `Investment Summary`,
-    `Total Estimated Budget: ${scope.budget}`,
-    ``,
-    `Engagement Timeline`,
-    `Estimated Duration: ${scope.timeline}`,
-    ``,
-    `---`,
-    ``,
-  ];
-  return lines.join('\n');
+async function getOrCreateFolder(
+  drive: ReturnType<typeof google.drive>,
+  name: string,
+  parentId: string,
+): Promise<string> {
+  const res = await drive.files.list({
+    q: `name = '${name}' and '${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
+    corpora: 'drive',
+    driveId: SHARED_DRIVE_ID,
+    fields: 'files(id)',
+  });
+
+  if (res.data.files && res.data.files.length > 0) {
+    return res.data.files[0].id!;
+  }
+
+  const folder = await drive.files.create({
+    supportsAllDrives: true,
+    requestBody: {
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentId],
+    },
+    fields: 'id',
+  });
+
+  return folder.data.id!;
 }
 
 async function main() {
@@ -138,32 +176,40 @@ async function main() {
   const drive = google.drive({ version: 'v3', auth });
   const docs = google.docs({ version: 'v1', auth });
 
+  // Ensure Test Scopes folder exists
+  process.stdout.write(`Locating "${TEST_FOLDER_NAME}" folder ... `);
+  const testFolderId = await getOrCreateFolder(drive, TEST_FOLDER_NAME, SHARED_DRIVE_ID);
+  console.log(`ready (${testFolderId})`);
+
   const created: string[] = [];
 
   for (const scope of FAKE_SCOPES) {
-    process.stdout.write(`  Creating "${scope.title}" ... `);
+    const title = `[TEST] ${scope.companyName} – ${scope.projectName}`;
+    process.stdout.write(`  Creating "${title}" ... `);
 
+    // Copy template into Test Scopes folder
     const copy = await drive.files.copy({
       fileId: TEMPLATE_FILE_ID,
+      supportsAllDrives: true,
       requestBody: {
-        name: scope.title,
-        parents: [TARGET_FOLDER_ID],
+        name: title,
+        parents: [testFolderId],
       },
+      fields: 'id',
     });
 
     const docId = copy.data.id!;
 
-    // Prepend the fake metadata block at position 1 (before the template content)
+    // Replace all placeholder text with fake data
     await docs.documents.batchUpdate({
       documentId: docId,
       requestBody: {
         requests: [
-          {
-            insertText: {
-              location: { index: 1 },
-              text: buildDocHeader(scope),
-            },
-          },
+          { replaceAllText: { containsText: { text: 'Project Name', matchCase: true }, replaceText: scope.projectName } },
+          { replaceAllText: { containsText: { text: 'CompanyName', matchCase: true }, replaceText: scope.companyName } },
+          { replaceAllText: { containsText: { text: 'October 15, 2020', matchCase: false }, replaceText: scope.date } },
+          { replaceAllText: { containsText: { text: 'Client Contact', matchCase: true }, replaceText: scope.contactName } },
+          { replaceAllText: { containsText: { text: 'Sales Name', matchCase: true }, replaceText: scope.salesName } },
         ],
       },
     });
@@ -173,8 +219,8 @@ async function main() {
     created.push(url);
   }
 
-  console.log(`\nCreated ${created.length} test SOW documents in folder:`);
-  console.log(`  https://drive.google.com/drive/folders/${TARGET_FOLDER_ID}`);
+  console.log(`\nCreated ${created.length} test SOW documents in "${TEST_FOLDER_NAME}":`);
+  console.log(`  https://drive.google.com/drive/folders/${testFolderId}`);
 }
 
 main().catch((err) => {

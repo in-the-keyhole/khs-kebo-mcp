@@ -88,3 +88,16 @@ export function validateEmbeddingDimensions(vector: number[], expected: number):
     );
   }
 }
+
+/**
+ * Guard against NaN/Infinity values before using a vector in raw SQL.
+ * node-llama-cpp should never produce these, but validate at the boundary.
+ */
+export function validateFiniteVector(vector: number[]): void {
+  if (vector.length === 0) throw new Error('Embedding vector is empty');
+  for (let i = 0; i < vector.length; i++) {
+    if (!Number.isFinite(vector[i])) {
+      throw new Error(`Non-finite value in embedding vector at index ${i}: ${vector[i]}`);
+    }
+  }
+}

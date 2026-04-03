@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sanitizeToolError } from './server-utils.js';
 import { searchDrive } from './services/drive.js';
 import { fetchAndStoreDriveFiles } from './tools/fetch-documents.js';
 import { embedDocument } from './tools/embed-document.js';
@@ -17,7 +18,7 @@ export function createServer() {
     'fetch_drive_documents',
     'Search Google Drive for documents matching a query, present a selection checklist, then redact and store chosen documents. Automatically generates embeddings for each stored document.',
     {
-      query: z.string().describe('Natural language search query for Google Drive'),
+      query: z.string().min(1).max(500).describe('Natural language search query for Google Drive'),
       maxResults: z.number().int().min(1).max(50).default(20).describe('Max Drive results to present'),
     },
     async ({ query, maxResults }) => {
@@ -63,7 +64,7 @@ export function createServer() {
           const result = await embedDocument(doc.id, db);
           embeds.push({ title: doc.title, embeddingId: result.embeddingId });
         } catch (err) {
-          embeds.push({ title: doc.title, error: String(err) });
+          embeds.push({ title: doc.title, error: sanitizeToolError(err) });
         }
       }
 
@@ -111,7 +112,7 @@ export function createServer() {
     'query_insights',
     'Query the embedded document database for insights relevant to a natural language question. Returns aggregated patterns (industry mix, tech stacks, budget tiers, cloud providers) — never raw client data.',
     {
-      query: z.string().describe('Natural language question, e.g. "What cloud providers do our healthcare clients use?"'),
+      query: z.string().min(1).max(500).describe('Natural language question, e.g. "What cloud providers do our healthcare clients use?"'),
       threshold: z.number().min(0).max(1).default(0.7).describe('Cosine similarity threshold (0–1, default 0.7)'),
       limit: z.number().int().min(1).max(50).default(10).describe('Max documents to consider'),
     },

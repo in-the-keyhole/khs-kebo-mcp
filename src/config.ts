@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateHfIdentifier, validateCredentialPath } from './config-validators.js';
 
 const schema = z.object({
   DATABASE_URL: z.string().url(),
@@ -22,7 +23,17 @@ function loadConfig() {
     const missing = result.error.issues.map((i) => i.path.join('.')).join(', ');
     throw new Error(`Missing or invalid environment variables: ${missing}`);
   }
-  return result.data;
+
+  const cfg = result.data;
+
+  // Validate paths and identifiers to prevent traversal / injection
+  validateCredentialPath(cfg.GOOGLE_SERVICE_ACCOUNT_KEY_PATH);
+  validateHfIdentifier(cfg.EMBEDDING_HF_REPO, 'repo');
+  validateHfIdentifier(cfg.EMBEDDING_HF_FILE, 'file');
+  validateHfIdentifier(cfg.LLM_HF_REPO, 'repo');
+  validateHfIdentifier(cfg.LLM_HF_FILE, 'file');
+
+  return cfg;
 }
 
 export const config = loadConfig();

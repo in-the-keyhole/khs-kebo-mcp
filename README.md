@@ -114,11 +114,11 @@ Integration tests spin up a real pgvector container via testcontainers. LLM and 
 - [x] Structured anonymized summary generation (local LLM)
 - [x] pgvector embeddings (local model)
 - [x] Cosine similarity insight queries
-- [x] 39 tests passing (unit + integration)
+- [x] 56 tests passing (unit)
+- [x] Security review — input validation, error sanitization, vector finite guard, LLM input truncation
 - [ ] SOW template-aware extraction prompts
 - [ ] Claude Desktop end-to-end verification
-- [ ] Hardening + security review before open source release
 
 ## License
 
-TBD — will be open sourced once hardened and reviewed.
+TBD — will be confirmed before first stable release.

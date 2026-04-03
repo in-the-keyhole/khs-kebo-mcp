@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { embedText } from '../services/embedding.js';
+import { embedText, validateFiniteVector } from '../services/embedding.js';
 import { documentEmbeddings } from '../db/schema.js';
 import type { Db } from '../db/client.js';
 import type { InsightResult, StructuredSummary, BudgetTier, EngagementType } from '../types.js';
@@ -23,6 +23,7 @@ export async function queryInsights(
   const limit = options.limit ?? 10;
 
   const queryVector = await embedText(query);
+  validateFiniteVector(queryVector); // guard before interpolating into raw SQL
 
   // pgvector cosine distance: 1 - (embedding <=> query) = cosine similarity
   // We use raw SQL for the vector operator since Drizzle doesn't expose <=>

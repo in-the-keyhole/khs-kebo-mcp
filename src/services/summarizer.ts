@@ -115,12 +115,25 @@ function toStringArray(val: unknown): string[] {
  * Generate a structured summary from document text using a local LLM.
  * The context must be from a loaded LlamaModel chat session.
  */
+const LLM_MAX_CHARS = 50_000;
+
+/**
+ * Truncate document text before sending to the LLM.
+ * Prevents runaway token consumption and limits prompt injection surface.
+ */
+const TRUNCATION_SUFFIX = '\n[truncated]';
+
+export function truncateForLlm(text: string, limit = LLM_MAX_CHARS): string {
+  if (text.length <= limit) return text;
+  return text.slice(0, limit - TRUNCATION_SUFFIX.length) + TRUNCATION_SUFFIX;
+}
+
 export async function generateSummary(
   text: string,
   generateFn: (prompt: string) => Promise<string>,
   templateContext = '',
 ): Promise<StructuredSummary> {
-  const prompt = buildSummaryPrompt(text, templateContext);
+  const prompt = buildSummaryPrompt(truncateForLlm(text), templateContext);
   const raw = await generateFn(prompt);
   return parseSummaryJson(raw);
 }
