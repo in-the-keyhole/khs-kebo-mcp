@@ -1,4 +1,4 @@
-import { parseSummaryJson, buildSummaryPrompt, generateSummary } from '../../src/services/summarizer.js';
+import { parseSummaryJson, buildSummaryPrompt, generateSummary, stripKeyholePreamble } from '../../src/services/summarizer.js';
 import type { StructuredSummary } from '../../src/types.js';
 
 describe('generateSummary', () => {
@@ -168,5 +168,53 @@ Budget: $2.1M over 18 months.
   it('omits template section when context is empty string', () => {
     const prompt = buildSummaryPrompt('some text', '');
     expect(prompt).not.toContain('Document structure guidance');
+  });
+});
+
+describe('stripKeyholePreamble', () => {
+  const BOILERPLATE = `About Keyhole Software
+Core competencies include Java, .NET, JavaScript, as well as cloud technologies such as Azure and AWS.
+Keyhole History
+Founded in 2008...
+
+`;
+  const SOW_CONTENT = `Statement of Work
+Client requires a React Native app on GCP.`;
+
+  it('removes the About Keyhole Software section when followed by Statement of Work', () => {
+    const doc = `Cover page text.\n\n${BOILERPLATE}${SOW_CONTENT}`;
+    const result = stripKeyholePreamble(doc);
+    expect(result).not.toContain('About Keyhole Software');
+    expect(result).not.toContain('Core competencies');
+    expect(result).toContain('Statement of Work');
+    expect(result).toContain('React Native');
+    expect(result).toContain('Cover page text.');
+  });
+
+  it('preserves content before the boilerplate', () => {
+    const doc = `Title\nClient: Acme Corp\n\n${BOILERPLATE}${SOW_CONTENT}`;
+    const result = stripKeyholePreamble(doc);
+    expect(result).toContain('Title');
+    expect(result).toContain('Acme Corp');
+  });
+
+  it('returns text unchanged when no About Keyhole Software section is present', () => {
+    const doc = 'Client wants React on AWS. Budget $2M.';
+    expect(stripKeyholePreamble(doc)).toBe(doc);
+  });
+
+  it('strips to end-of-string when boilerplate has no Statement of Work following it', () => {
+    const doc = `Preamble text.\n\n${BOILERPLATE}`;
+    const result = stripKeyholePreamble(doc);
+    expect(result).toContain('Preamble text.');
+    expect(result).not.toContain('About Keyhole Software');
+    expect(result).not.toContain('Core competencies');
+  });
+
+  it('is case-insensitive for the section markers', () => {
+    const doc = 'about keyhole software\nJava, .NET\n\nstatement of work\nReal content.';
+    const result = stripKeyholePreamble(doc);
+    expect(result).not.toContain('Java');
+    expect(result).toContain('Real content.');
   });
 });

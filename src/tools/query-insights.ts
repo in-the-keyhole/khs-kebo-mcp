@@ -43,6 +43,16 @@ export async function queryInsights(
   return aggregateSummaries(rows.map((r) => r.structured_summary), threshold);
 }
 
+/** Normalise cloud provider names so variants count as one. */
+function normaliseCloudProvider(raw: string): string {
+  const lower = raw.toLowerCase().trim();
+  if (lower.includes('azure') || lower.includes('microsoft azure')) return 'Azure';
+  if (lower.includes('google cloud') || lower === 'gcp') return 'GCP';
+  if (lower === 'aws' || lower.includes('amazon web')) return 'AWS';
+  if (lower.includes('on-prem') || lower.includes('on premise')) return 'on-premise';
+  return raw.trim(); // preserve less common values as-is
+}
+
 function aggregateSummaries(
   summaries: StructuredSummary[],
   similarityThreshold: number,
@@ -67,7 +77,8 @@ function aggregateSummaries(
       techStack[tech] = (techStack[tech] ?? 0) + 1;
     }
     for (const provider of s.cloud_providers) {
-      cloudProviders[provider] = (cloudProviders[provider] ?? 0) + 1;
+      const normalised = normaliseCloudProvider(provider);
+      cloudProviders[normalised] = (cloudProviders[normalised] ?? 0) + 1;
     }
   }
 

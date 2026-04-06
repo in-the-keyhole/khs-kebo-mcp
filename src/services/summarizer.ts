@@ -30,16 +30,17 @@ IMPORTANT: This document contains boilerplate sections about the consulting firm
 Return ONLY a JSON object with these exact fields (no markdown, no explanation):
 {
   "industry": "<single lowercase industry label, e.g. fintech, healthcare, logistics, retail, manufacturing, saas, govtech>",
-  "tech_stack": ["<technologies specific to this client's project — from requirements, architecture, or deliverables sections>"],
+  "tech_stack": ["<programming languages, frameworks, databases, and platforms the CLIENT requires — e.g. React, Java, PostgreSQL, Kubernetes. DO NOT include app distribution platforms (Google Play, App Store), analytics tools (Google Analytics), or generic consulting deliverables>"],
   "budget_tier": "<one of: startup, smb, enterprise>",
-  "cloud_providers": ["<AWS | Azure | GCP | on-premise | none — specific to this project>"],
+  "cloud_providers": ["<cloud infrastructure providers only: AWS | Azure | GCP | on-premise | none. DO NOT include app stores or analytics platforms>"],
   "engagement_type": "<one of: greenfield, migration, support, augmentation>"
 }
 
-Budget tier guidance:
-- startup: early-stage, small budgets, typically under $500K total engagement value
-- smb: small-to-mid business, $500K–$5M range
-- enterprise: large organisations, over $5M or Fortune-500 type
+Budget tier guidance — look at the "Estimated Schedule and Charges" or "Investment" section for the total dollar amount:
+- startup: total engagement value under $500K (e.g. $50K–$499K)
+- smb: total engagement value $500K–$5M
+- enterprise: total engagement value over $5M, OR explicitly described as Fortune-500 / large enterprise
+DO NOT infer budget from technical complexity. Use the stated dollar amount if present.
 
 Document to analyse:
 ---
@@ -129,12 +130,33 @@ export function truncateForLlm(text: string, limit = LLM_MAX_CHARS): string {
   return text.slice(0, limit - TRUNCATION_SUFFIX.length) + TRUNCATION_SUFFIX;
 }
 
+/**
+ * Strip the "About Keyhole Software" boilerplate section that appears near the
+ * top of every SOW before the actual Statement of Work content.  Without this,
+ * Phi-4-mini (and similar small models) extract Keyhole's own tech stack
+ * (Java, .NET, JavaScript, Azure, AWS) instead of the client's.
+ *
+ * Removes text from "About Keyhole Software" up to (but not including) the
+ * next section header — typically "Statement of Work".  Falls back to
+ * stripping to end-of-string if no end marker is found.
+ */
+export function stripKeyholePreamble(text: string): string {
+  const startIdx = text.search(/\bAbout Keyhole Software\b/i);
+  if (startIdx === -1) return text;
+
+  const after = text.slice(startIdx);
+  const endIdx = after.search(/\bStatement of Work\b/i);
+
+  if (endIdx === -1) return text.slice(0, startIdx);
+  return text.slice(0, startIdx) + text.slice(startIdx + endIdx);
+}
+
 export async function generateSummary(
   text: string,
   generateFn: (prompt: string) => Promise<string>,
   templateContext = '',
 ): Promise<StructuredSummary> {
-  const prompt = buildSummaryPrompt(truncateForLlm(text), templateContext);
+  const prompt = buildSummaryPrompt(truncateForLlm(stripKeyholePreamble(text)), templateContext);
   const raw = await generateFn(prompt);
   return parseSummaryJson(raw);
 }

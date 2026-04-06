@@ -24,10 +24,14 @@ export async function getLlamaModel(): Promise<LlamaModel> {
     generate: async (prompt) => {
       // Fresh context + session for each call — prevents chat history bleed
       const { LlamaChatSession } = await import('node-llama-cpp');
-      const ctx: LlamaContext = await _model!.createContext();
+      // contextSize: 4096 keeps KV-cache allocation small and fast on CPU.
+      // Our prompts are ~2500 tokens; 4096 leaves ~1500 tokens for the response.
+      const ctx: LlamaContext = await _model!.createContext({ contextSize: 4096 });
       const session: LlamaChatSession = new LlamaChatSession({ contextSequence: ctx.getSequence() });
       try {
-        return await session.prompt(prompt);
+        // maxTokens prevents runaway generation — a structured JSON response
+        // needs at most ~300 tokens; 512 is generous headroom.
+        return await session.prompt(prompt, { maxTokens: 512 });
       } finally {
         await session.dispose();
         await ctx.dispose();
