@@ -13,6 +13,7 @@ const config: Config = {
   setupFiles: ['./tests/setup.ts'],
   testMatch: ['**/tests/**/*.test.ts'],
   testTimeout: 60000, // testcontainers can be slow on first pull
+  forceExit: true, // node-llama-cpp has top-level awaits that outlive the test runner
 };
 
 export default config;

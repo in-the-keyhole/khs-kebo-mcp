@@ -100,7 +100,7 @@ describe('embedDocument', () => {
       .where(eq(documentEmbeddings.documentId, storedDocId));
 
     expect(rows.length).toBeGreaterThanOrEqual(1);
-    expect(rows[0].modelName).toBe('mixedbread-ai/mxbai-embed-large-v1-GGUF/mxbai-embed-large-v1-f16.gguf');
+    expect(rows[0].modelName).toBe('ChristianAzinn/mxbai-embed-large-v1-gguf/mxbai-embed-large-v1_fp16.gguf');
     expect(rows[0].structuredSummary).toMatchObject({ industry: 'fintech' });
   });
 

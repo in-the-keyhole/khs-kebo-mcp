@@ -109,7 +109,7 @@ export function createServer() {
     'Query the embedded document database for insights relevant to a natural language question. Returns aggregated patterns (industry mix, tech stacks, budget tiers, cloud providers) — never raw client data.',
     {
       query: z.string().min(1).max(500).describe('Natural language question, e.g. "What cloud providers do our healthcare clients use?"'),
-      threshold: z.number().min(0).max(1).default(0.7).describe('Cosine similarity threshold (0–1, default 0.7)'),
+      threshold: z.number().min(0).max(1).default(0.3).describe('Cosine similarity threshold (0–1, default 0.3)'),
       limit: z.number().int().min(1).max(50).default(10).describe('Max documents to consider'),
     },
     async ({ query, threshold, limit }) => {

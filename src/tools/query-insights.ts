@@ -19,7 +19,7 @@ export async function queryInsights(
   db: Db,
   options: QueryOptions = {},
 ): Promise<InsightResult> {
-  const threshold = options.threshold ?? 0.7;
+  const threshold = options.threshold ?? 0.3;
   const limit = options.limit ?? 10;
 
   const queryVector = await embedText(query);

@@ -183,11 +183,13 @@ describe('fetchFileContent — MIME routing', () => {
   });
 
   it('returns empty string for unsupported binary types', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const result = await fetchFileContent({
       id: 'pdf-1',
       name: 'contract.pdf',
       mimeType: 'application/pdf',
     });
+    consoleSpy.mockRestore();
 
     expect(result).toBe('');
     expect(mockFilesExport).not.toHaveBeenCalled();

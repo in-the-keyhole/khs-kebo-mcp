@@ -3,6 +3,7 @@ import { createServer } from './server.js';
 import { closeDb } from './db/client.js';
 import { disposeEmbeddingContext } from './services/embedding.js';
 
+
 const server = createServer();
 const transport = new StdioServerTransport();
 

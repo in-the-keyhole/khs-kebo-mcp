@@ -22,16 +22,17 @@ export function buildSummaryPrompt(documentText: string, templateContext = ''): 
     ? `\n\nDocument structure guidance:\n${templateContext}`
     : '';
 
-  return `You are an analyst extracting anonymized metadata from a client engagement document.
+  return `You are an analyst extracting anonymized metadata from a client engagement document (a Statement of Work or proposal).
 Do not identify the client by name or reference any individual's name.
-Focus only on: what industry they are in, what technologies they use, their budget scale, cloud infrastructure, and the type of engagement.${templateHint}
+
+IMPORTANT: This document contains boilerplate sections about the consulting firm's own capabilities (e.g. "About Keyhole Software", "Core competencies include Java, .NET..."). IGNORE these sections entirely. Extract only technologies, cloud providers, and details that are specific to THIS CLIENT'S project requirements and deliverables.${templateHint}
 
 Return ONLY a JSON object with these exact fields (no markdown, no explanation):
 {
   "industry": "<single lowercase industry label, e.g. fintech, healthcare, logistics, retail, manufacturing, saas, govtech>",
-  "tech_stack": ["<technology names as used in the doc>"],
+  "tech_stack": ["<technologies specific to this client's project — from requirements, architecture, or deliverables sections>"],
   "budget_tier": "<one of: startup, smb, enterprise>",
-  "cloud_providers": ["<AWS | Azure | GCP | on-premise | none>"],
+  "cloud_providers": ["<AWS | Azure | GCP | on-premise | none — specific to this project>"],
   "engagement_type": "<one of: greenfield, migration, support, augmentation>"
 }
 

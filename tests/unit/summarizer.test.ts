@@ -1,5 +1,50 @@
-import { parseSummaryJson, buildSummaryPrompt } from '../../src/services/summarizer.js';
+import { parseSummaryJson, buildSummaryPrompt, generateSummary } from '../../src/services/summarizer.js';
 import type { StructuredSummary } from '../../src/types.js';
+
+describe('generateSummary', () => {
+  it('passes the full document text to the generate function', async () => {
+    const capturedPrompts: string[] = [];
+    const mockGenerate = async (prompt: string) => {
+      capturedPrompts.push(prompt);
+      return JSON.stringify({
+        industry: 'fintech', tech_stack: ['React'], budget_tier: 'smb',
+        cloud_providers: ['AWS'], engagement_type: 'greenfield',
+      });
+    };
+
+    await generateSummary('Client needs React on AWS for their fintech app.', mockGenerate);
+    expect(capturedPrompts[0]).toContain('React on AWS');
+  });
+
+  it('each call receives its own prompt — no shared session state', async () => {
+    // Regression: if a single chat session is reused across calls, the second
+    // call sees the first call's response in its history and copies it.
+    const capturedPrompts: string[] = [];
+    const responses = [
+      { industry: 'fintech', tech_stack: ['React'], budget_tier: 'smb' as const, cloud_providers: ['AWS'], engagement_type: 'greenfield' as const },
+      { industry: 'healthcare', tech_stack: ['Python'], budget_tier: 'enterprise' as const, cloud_providers: ['GCP'], engagement_type: 'migration' as const },
+    ];
+    let callCount = 0;
+    const mockGenerate = async (prompt: string) => {
+      capturedPrompts.push(prompt);
+      return JSON.stringify(responses[callCount++]);
+    };
+
+    const result1 = await generateSummary('Fintech app using React on AWS', mockGenerate);
+    const result2 = await generateSummary('Healthcare migration using Python on GCP', mockGenerate);
+
+    // Each call must receive a fresh prompt containing only its own document
+    expect(capturedPrompts[0]).toContain('Fintech app using React');
+    expect(capturedPrompts[0]).not.toContain('Healthcare migration');
+    expect(capturedPrompts[1]).toContain('Healthcare migration');
+    expect(capturedPrompts[1]).not.toContain('Fintech app using React');
+
+    // Results must differ — not a copy of the first response
+    expect(result1.industry).toBe('fintech');
+    expect(result2.industry).toBe('healthcare');
+    expect(result1.tech_stack).not.toEqual(result2.tech_stack);
+  });
+});
 
 describe('parseSummaryJson', () => {
   it('parses a valid complete summary', () => {
@@ -76,6 +121,41 @@ describe('buildSummaryPrompt', () => {
   it('instructs the LLM not to reveal client identity', () => {
     const prompt = buildSummaryPrompt('some text');
     expect(prompt.toLowerCase()).toMatch(/no.*client|client.*name|do not.*identify/);
+  });
+
+  it('explicitly warns the LLM to ignore consulting firm boilerplate', () => {
+    // Regression: without this, the LLM extracts Keyhole's own tech stack
+    // (Java, .NET, JavaScript, Azure, AWS) from the "About Keyhole" section
+    // present in every SOW, producing identical summaries for all documents.
+    const prompt = buildSummaryPrompt('some text');
+    expect(prompt.toLowerCase()).toMatch(/ignore|boilerplate|about keyhole/);
+  });
+
+  it('tells the LLM to extract client-project-specific tech, not consulting firm capabilities', () => {
+    const prompt = buildSummaryPrompt('some text');
+    expect(prompt.toLowerCase()).toMatch(/specific.*project|client.*project|project.*requirement/);
+  });
+
+  it('includes boilerplate-heavy SOW doc without burying the client tech instruction', () => {
+    const keyholeSow = `
+About Keyhole Software
+Core competencies include Java, .NET, JavaScript, as well as cloud technologies such as Azure and AWS.
+
+Project Requirements
+The client needs a React Native mobile app with a Python/FastAPI backend deployed on GCP.
+Budget: $2.1M over 18 months.
+    `.trim();
+
+    const prompt = buildSummaryPrompt(keyholeSow);
+    // The document text must appear in the prompt
+    expect(prompt).toContain('React Native');
+    expect(prompt).toContain('Python/FastAPI');
+    expect(prompt).toContain('GCP');
+    // The boilerplate warning must come BEFORE the document text
+    const boilerplateWarningIdx = prompt.toLowerCase().indexOf('ignore');
+    const documentIdx = prompt.indexOf('React Native');
+    expect(boilerplateWarningIdx).toBeGreaterThanOrEqual(0);
+    expect(boilerplateWarningIdx).toBeLessThan(documentIdx);
   });
 
   it('includes template context when provided', () => {

@@ -1,4 +1,4 @@
-import { getLlama, LlamaEmbeddingContext, LlamaModel } from 'node-llama-cpp';
+import { getLlama, LlamaLogLevel, LlamaEmbeddingContext, LlamaModel } from 'node-llama-cpp';
 import { config } from '../config.js';
 
 // Singleton model + context — loaded once, reused across calls
@@ -8,7 +8,7 @@ let _embeddingModel: LlamaModel | null = null;
 export async function getEmbeddingContext(): Promise<LlamaEmbeddingContext> {
   if (_embeddingContext) return _embeddingContext;
 
-  const llama = await getLlama();
+  const llama = await getLlama({ logLevel: LlamaLogLevel.disabled });
   _embeddingModel = await llama.loadModel({
     modelPath: await resolveModelPath(config.EMBEDDING_HF_REPO, config.EMBEDDING_HF_FILE),
   });

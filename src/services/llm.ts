@@ -1,4 +1,4 @@
-import { getLlama, type LlamaChatSession, type LlamaModel as LlamaModelType } from 'node-llama-cpp';
+import { getLlama, LlamaLogLevel, type LlamaChatSession, type LlamaModel as LlamaModelType, type LlamaContext } from 'node-llama-cpp';
 import { config } from '../config.js';
 import path from 'path';
 
@@ -7,36 +7,34 @@ interface LlamaModel {
   dispose(): Promise<void>;
 }
 
+// Keep the loaded model singleton — expensive to reload
+// But create a fresh context+session per generate() call to avoid
+// chat history contaminating subsequent documents
 let _model: LlamaModelType | null = null;
-let _session: LlamaChatSession | null = null;
 
 export async function getLlamaModel(): Promise<LlamaModel> {
-  if (_model && _session) {
-    return {
-      generate: (prompt) => _session!.prompt(prompt),
-      dispose: async () => {
-        await _session?.dispose();
-        await _model?.dispose();
-        _session = null;
-        _model = null;
-      },
-    };
+  if (!_model) {
+    const llama = await getLlama({ logLevel: LlamaLogLevel.disabled });
+    _model = await llama.loadModel({
+      modelPath: await resolveModelPath(config.LLM_HF_REPO, config.LLM_HF_FILE),
+    });
   }
 
-  const llama = await getLlama();
-  _model = await llama.loadModel({
-    modelPath: await resolveModelPath(config.LLM_HF_REPO, config.LLM_HF_FILE),
-  });
-
-  const ctx = await _model.createContext();
-  _session = new (await import('node-llama-cpp')).LlamaChatSession({ contextSequence: ctx.getSequence() });
-
   return {
-    generate: (prompt) => _session!.prompt(prompt),
+    generate: async (prompt) => {
+      // Fresh context + session for each call — prevents chat history bleed
+      const { LlamaChatSession } = await import('node-llama-cpp');
+      const ctx: LlamaContext = await _model!.createContext();
+      const session: LlamaChatSession = new LlamaChatSession({ contextSequence: ctx.getSequence() });
+      try {
+        return await session.prompt(prompt);
+      } finally {
+        await session.dispose();
+        await ctx.dispose();
+      }
+    },
     dispose: async () => {
-      await _session?.dispose();
       await _model?.dispose();
-      _session = null;
       _model = null;
     },
   };

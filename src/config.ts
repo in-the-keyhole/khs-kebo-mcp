@@ -2,19 +2,19 @@ import { z } from 'zod';
 import { validateHfIdentifier, validateCredentialPath } from './config-validators.js';
 
 const schema = z.object({
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.string(),
   GOOGLE_SERVICE_ACCOUNT_KEY_PATH: z.string(),
   GOOGLE_DRIVE_FOLDER_ID: z.string().optional(),
   // Optional: Drive file ID of the SOW template used to structure extraction prompts
   SCOPE_OF_WORK_TEMPLATE_FILE_ID: z.string().optional(),
 
   // Embedding model — GGUF via HuggingFace
-  EMBEDDING_HF_REPO: z.string().default('mixedbread-ai/mxbai-embed-large-v1-GGUF'),
-  EMBEDDING_HF_FILE: z.string().default('mxbai-embed-large-v1-f16.gguf'),
+  EMBEDDING_HF_REPO: z.string().default('ChristianAzinn/mxbai-embed-large-v1-gguf'),
+  EMBEDDING_HF_FILE: z.string().default('mxbai-embed-large-v1_fp16.gguf'),
 
   // LLM for redaction + structured summary generation
-  LLM_HF_REPO: z.string().default('bartowski/Phi-4-mini-instruct-GGUF'),
-  LLM_HF_FILE: z.string().default('Phi-4-mini-instruct-Q4_K_M.gguf'),
+  LLM_HF_REPO: z.string().default('bartowski/microsoft_Phi-4-mini-instruct-GGUF'),
+  LLM_HF_FILE: z.string().default('microsoft_Phi-4-mini-instruct-Q4_K_M.gguf'),
 });
 
 function loadConfig() {
