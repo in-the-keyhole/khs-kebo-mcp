@@ -15,7 +15,6 @@ export const documents = pgTable('documents', {
   title: text('title').notNull(),
   mimeType: text('mime_type').notNull(),
   contentRedacted: text('content_redacted').notNull(),
-  tags: text('tags').array(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

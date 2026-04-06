@@ -53,7 +53,8 @@ export async function embedDocument(documentId: string, db: Db): Promise<EmbedRe
   // Generate embedding from the anonymized summary text
   const vector = await embedText(summaryText);
 
-  // Upsert embedding (allow re-embedding the same doc with a newer model)
+  // Replace any existing embedding for this document (idempotent re-embed)
+  await db.delete(documentEmbeddings).where(eq(documentEmbeddings.documentId, documentId));
   const [embedding] = await db
     .insert(documentEmbeddings)
     .values({
@@ -62,7 +63,6 @@ export async function embedDocument(documentId: string, db: Db): Promise<EmbedRe
       modelName: MODEL_NAME,
       structuredSummary: summary,
     })
-    .onConflictDoNothing()
     .returning();
 
   return {

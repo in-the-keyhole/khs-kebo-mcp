@@ -16,7 +16,7 @@ const { fetchFileContent } = await import('../../src/services/drive.js');
 const { startTestDb, stopTestDb } = await import('./db-setup.js');
 const { documents } = await import('../../src/db/schema.js');
 const { getDb } = await import('../../src/db/client.js');
-const { redactAndStore } = await import('../../src/tools/fetch-documents.js');
+const { redactAndStore, fetchAndStoreDriveFiles } = await import('../../src/tools/fetch-documents.js');
 
 type MockedFn<T extends (...args: never[]) => unknown> = jest.MockedFunction<T>;
 const mockFetchContent = fetchFileContent as MockedFn<typeof fetchFileContent>;
@@ -34,6 +34,8 @@ afterAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+// ─── redactAndStore ───────────────────────────────────────────────────────────
 
 describe('redactAndStore', () => {
   it('stores a redacted document in the database', async () => {
@@ -57,6 +59,26 @@ describe('redactAndStore', () => {
     expect(doc!.contentRedacted).not.toContain('$250,000');
     expect(doc!.contentRedacted).toContain('React');
     expect(doc!.contentRedacted).toContain('AWS');
+  });
+
+  it('redacts phone numbers from document content', async () => {
+    const mockFile = {
+      id: 'drive-phone-test',
+      name: 'Phone Test Doc',
+      mimeType: 'text/plain',
+    };
+
+    mockFetchContent.mockResolvedValueOnce(
+      'Contact: (816) 555-0142. Email: test@example.com. Tech: Node.js, PostgreSQL.',
+    );
+
+    const db = getDb(testDb.connectionUrl);
+    const doc = await redactAndStore(mockFile, db);
+
+    expect(doc!.contentRedacted).toContain('[PHONE]');
+    expect(doc!.contentRedacted).toContain('[EMAIL]');
+    expect(doc!.contentRedacted).toContain('Node.js');
+    expect(doc!.contentRedacted).toContain('PostgreSQL');
   });
 
   it('skips files with no extractable content', async () => {
@@ -92,5 +114,67 @@ describe('redactAndStore', () => {
       .from(documents)
       .where(eq(documents.driveFileId, 'drive-file-789'));
     expect(rows).toHaveLength(1);
+  });
+
+  it('updates title and content when the same Drive file is re-imported', async () => {
+    const mockFile = { id: 'upsert-update-test', name: 'Original Title', mimeType: 'text/plain' };
+    const db = getDb(testDb.connectionUrl);
+
+    mockFetchContent.mockResolvedValueOnce('First version: React on AWS.');
+    await redactAndStore(mockFile, db);
+
+    mockFetchContent.mockResolvedValueOnce('Second version: Vue.js on Azure.');
+    const updated = await redactAndStore({ ...mockFile, name: 'Updated Title' }, db);
+
+    expect(updated!.title).toBe('Updated Title');
+    expect(updated!.contentRedacted).toContain('Vue.js');
+    expect(updated!.contentRedacted).not.toContain('First version');
+
+    const rows = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.driveFileId, 'upsert-update-test'));
+    expect(rows).toHaveLength(1);
+  });
+});
+
+// ─── fetchAndStoreDriveFiles ──────────────────────────────────────────────────
+
+describe('fetchAndStoreDriveFiles', () => {
+  it('stores all files with content and skips those without', async () => {
+    const files = [
+      { id: 'batch-1', name: 'SOW Healthcare', mimeType: 'application/vnd.google-apps.document' },
+      { id: 'batch-2', name: 'empty-binary.pdf', mimeType: 'application/pdf' },
+      { id: 'batch-3', name: 'SOW Fintech', mimeType: 'application/vnd.google-apps.document' },
+    ];
+
+    mockFetchContent
+      .mockResolvedValueOnce('Healthcare project using Python and Azure.')
+      .mockResolvedValueOnce('') // PDF — no content
+      .mockResolvedValueOnce('Fintech project using React and AWS.');
+
+    const db = getDb(testDb.connectionUrl);
+    const { stored, skipped } = await fetchAndStoreDriveFiles(files, db);
+
+    expect(stored).toHaveLength(2);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0]).toBe('empty-binary.pdf');
+    expect(stored.map((d) => d.driveFileId)).toContain('batch-1');
+    expect(stored.map((d) => d.driveFileId)).toContain('batch-3');
+  });
+
+  it('returns empty arrays when all files have no content', async () => {
+    const files = [
+      { id: 'empty-1', name: 'img.png', mimeType: 'image/png' },
+      { id: 'empty-2', name: 'doc.pdf', mimeType: 'application/pdf' },
+    ];
+
+    mockFetchContent.mockResolvedValue('');
+
+    const db = getDb(testDb.connectionUrl);
+    const { stored, skipped } = await fetchAndStoreDriveFiles(files, db);
+
+    expect(stored).toHaveLength(0);
+    expect(skipped).toHaveLength(2);
   });
 });

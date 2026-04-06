@@ -16,43 +16,39 @@ export function createServer() {
   // ─── Tool 1: fetch_drive_documents ─────────────────────────────────────────
   server.tool(
     'fetch_drive_documents',
-    'Search Google Drive for documents matching a query, present a selection checklist, then redact and store chosen documents. Automatically generates embeddings for each stored document.',
+    'Search Google Drive for documents matching a query, redact and store them, then automatically generate embeddings. Leave query empty to import all documents in the configured folder.',
     {
-      query: z.string().min(1).max(500).describe('Natural language search query for Google Drive'),
-      maxResults: z.number().int().min(1).max(50).default(20).describe('Max Drive results to present'),
+      query: z.string().max(500).default('').describe('Search query for Google Drive. Leave empty to import all documents in the configured folder.'),
+      maxResults: z.number().int().min(1).max(50).default(20).describe('Max Drive results to import'),
     },
     async ({ query, maxResults }) => {
       const files = await searchDrive(query, maxResults);
 
       if (files.length === 0) {
         return {
-          content: [{ type: 'text', text: `No documents found in Drive matching: "${query}"` }],
+          content: [{ type: 'text', text: query ? `No documents found in Drive matching: "${query}"` : 'No documents found in the configured Drive folder.' }],
         };
       }
 
-      // Present checklist via MCP elicitation (server.server is the underlying Server instance)
-      const elicitation = await server.server.elicitInput({
-        message: `Found ${files.length} document(s) matching "${query}". Select which to import and embed:`,
-        requestedSchema: {
-          type: 'object' as const,
-          properties: {
-            selectedIds: {
-              type: 'array' as const,
-              items: { type: 'string' as const, enum: files.map((f) => f.id) },
-              description: files.map((f) => `${f.id}: ${f.name}`).join('\n'),
-            },
-          },
-          required: ['selectedIds'],
-        },
+      // Elicit selection — one boolean per document so clients render checkboxes
+      const properties: Record<string, { type: 'boolean'; description: string }> = {};
+      files.forEach((f, i) => {
+        properties[`doc_${i}`] = { type: 'boolean' as const, description: f.name };
       });
 
-      if (elicitation.action !== 'accept' || !elicitation.content?.selectedIds) {
+      const elicitation = await server.server.elicitInput({
+        message: `Found ${files.length} document(s). Select which to import and embed:`,
+        requestedSchema: { type: 'object' as const, properties },
+      });
+
+      if (elicitation.action !== 'accept') {
         return { content: [{ type: 'text', text: 'Import cancelled.' }] };
       }
 
-      const selectedFiles = files.filter((f) =>
-        (elicitation.content!.selectedIds as string[]).includes(f.id),
-      );
+      const selectedFiles = files.filter((_, i) => elicitation.content?.[`doc_${i}`] === true);
+      if (selectedFiles.length === 0) {
+        return { content: [{ type: 'text', text: 'No documents selected.' }] };
+      }
 
       const db = getDb();
       const { stored, skipped } = await fetchAndStoreDriveFiles(selectedFiles, db);

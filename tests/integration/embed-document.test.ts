@@ -14,8 +14,15 @@ jest.unstable_mockModule('../../src/services/embedding.js', () => ({
   embedText: jest.fn(),
   cosineSimilarity: jest.fn(),
   validateEmbeddingDimensions: jest.fn(),
+  validateFiniteVector: jest.fn(),
   getEmbeddingContext: jest.fn(),
   disposeEmbeddingContext: jest.fn(),
+}));
+
+jest.unstable_mockModule('../../src/services/template.js', () => ({
+  getSowSections: jest.fn().mockResolvedValue([]),
+  buildTemplateContext: jest.fn().mockReturnValue(''),
+  resetSowCache: jest.fn(),
 }));
 
 const { generateSummary } = await import('../../src/services/summarizer.js');
@@ -32,6 +39,14 @@ const mockEmbedText = embedText as MockedFn<typeof embedText>;
 // Pre-computed 1024-dim fixture vector
 const FIXTURE_VECTOR = Array.from({ length: 1024 }, (_, i) => Math.sin(i) * 0.1);
 
+const FIXTURE_SUMMARY = {
+  industry: 'fintech',
+  tech_stack: ['React', 'AWS Lambda', 'PostgreSQL'],
+  budget_tier: 'smb' as const,
+  cloud_providers: ['AWS'],
+  engagement_type: 'migration' as const,
+};
+
 let testDb: Awaited<ReturnType<typeof startTestDb>>;
 let storedDocId: string;
 
@@ -47,7 +62,6 @@ beforeAll(async () => {
       title: 'Fintech Migration Project',
       mimeType: 'application/vnd.google-apps.document',
       contentRedacted: 'Client uses React, AWS Lambda, and PostgreSQL. Mid-market fintech company.',
-      tags: [],
     })
     .returning();
   storedDocId = doc.id;
@@ -59,13 +73,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGenerateSummary.mockResolvedValue({
-    industry: 'fintech',
-    tech_stack: ['React', 'AWS Lambda', 'PostgreSQL'],
-    budget_tier: 'smb',
-    cloud_providers: ['AWS'],
-    engagement_type: 'migration',
-  });
+  mockGenerateSummary.mockResolvedValue(FIXTURE_SUMMARY);
   mockEmbedText.mockResolvedValue(FIXTURE_VECTOR);
 });
 
@@ -96,6 +104,45 @@ describe('embedDocument', () => {
     expect(rows[0].structuredSummary).toMatchObject({ industry: 'fintech' });
   });
 
+  it('is idempotent — re-embedding does not create duplicate rows', async () => {
+    const { eq } = await import('drizzle-orm');
+    const db = getDb(testDb.connectionUrl);
+
+    await embedDocument(storedDocId, db);
+    await embedDocument(storedDocId, db); // second embed of same doc
+
+    const rows = await db
+      .select()
+      .from(documentEmbeddings)
+      .where(eq(documentEmbeddings.documentId, storedDocId));
+
+    expect(rows).toHaveLength(1);
+  });
+
+  it('updates the stored summary when re-embedded with different mock output', async () => {
+    const { eq } = await import('drizzle-orm');
+    const db = getDb(testDb.connectionUrl);
+
+    await embedDocument(storedDocId, db);
+
+    // Simulate model producing a different summary on second run
+    mockGenerateSummary.mockResolvedValueOnce({
+      ...FIXTURE_SUMMARY,
+      industry: 'healthcare',
+      tech_stack: ['Python', 'Azure'],
+    });
+
+    await embedDocument(storedDocId, db);
+
+    const rows = await db
+      .select()
+      .from(documentEmbeddings)
+      .where(eq(documentEmbeddings.documentId, storedDocId));
+
+    expect(rows).toHaveLength(1);
+    expect((rows[0].structuredSummary as typeof FIXTURE_SUMMARY).industry).toBe('healthcare');
+  });
+
   it('throws when document does not exist', async () => {
     const db = getDb(testDb.connectionUrl);
     await expect(embedDocument('00000000-0000-0000-0000-000000000000', db)).rejects.toThrow(
@@ -103,7 +150,7 @@ describe('embedDocument', () => {
     );
   });
 
-  it('calls generateSummary with the document text', async () => {
+  it('calls generateSummary with the document text and a token function', async () => {
     const db = getDb(testDb.connectionUrl);
     await embedDocument(storedDocId, db);
 

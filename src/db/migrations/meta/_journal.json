@@ -8,6 +8,13 @@
       "when": 1775152015498,
       "tag": "0000_soft_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775484693586,
+      "tag": "0001_famous_spitfire",
+      "breakpoints": true
     }
   ]
 }

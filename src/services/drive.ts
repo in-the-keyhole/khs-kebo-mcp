@@ -27,11 +27,16 @@ export async function searchDrive(query: string, maxResults = 20): Promise<Drive
   const auth = await getAuthClient();
   const drive = getDriveClient();
 
-  // Build query: full-text search, optionally scoped to a folder
-  let q = `fullText contains '${query.replace(/'/g, "\\'")}' and trashed = false`;
-  if (config.GOOGLE_DRIVE_FOLDER_ID) {
-    q += ` and '${config.GOOGLE_DRIVE_FOLDER_ID}' in parents`;
+  // Build query: optionally filter by full-text, scoped to folder if configured.
+  // Empty query lists all documents in the folder (useful when content indexing is delayed).
+  const parts: string[] = ['trashed = false'];
+  if (query.trim()) {
+    parts.push(`fullText contains '${query.replace(/'/g, "\\'")}'`);
   }
+  if (config.GOOGLE_DRIVE_FOLDER_ID) {
+    parts.push(`'${config.GOOGLE_DRIVE_FOLDER_ID}' in parents`);
+  }
+  const q = parts.join(' and ');
 
   const response = await drive.files.list({
     auth,
@@ -39,6 +44,8 @@ export async function searchDrive(query: string, maxResults = 20): Promise<Drive
     pageSize: maxResults,
     fields: 'files(id, name, mimeType, webViewLink)',
     orderBy: 'modifiedTime desc',
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
   });
 
   return (response.data.files ?? []).map((f) => ({

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { fetchFileContent } from '../services/drive.js';
 import { redactRegex } from '../services/redaction.js';
 import { documents, type Document } from '../db/schema.js';
@@ -26,13 +26,12 @@ export async function redactAndStore(
       title: file.name,
       mimeType: file.mimeType,
       contentRedacted,
-      tags: [],
     })
     .onConflictDoUpdate({
       target: documents.driveFileId,
       set: {
-        title: file.name,
-        contentRedacted,
+        title: sql`excluded.title`,
+        contentRedacted: sql`excluded.content_redacted`,
       },
     })
     .returning();
