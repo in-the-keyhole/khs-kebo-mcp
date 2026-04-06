@@ -33,7 +33,6 @@ All model inference happens on-device. No OpenAI, no external embedding API, no 
 - Node.js 22+
 - Docker (for PostgreSQL + pgvector)
 - ~3.7 GB disk for models (downloaded automatically on first run)
-- A [HuggingFace account](https://huggingface.co) with a read token (required even for public model downloads)
 - A Google Cloud service account with Drive read access (see [Google Drive setup](#google-drive-setup))
 
 ## Setup
@@ -44,11 +43,9 @@ npm install
 
 # 2. Copy and fill in environment config
 cp .env.example .env
-# Required fields: DATABASE_URL, HF_TOKEN, GOOGLE_SERVICE_ACCOUNT_KEY_PATH
+# Required fields: DATABASE_URL, GOOGLE_SERVICE_ACCOUNT_KEY_PATH
 # See .env.example for all options and documentation
 ```
-
-**HuggingFace token:** Create a read token at https://huggingface.co/settings/tokens and set it as `HF_TOKEN` in `.env`. This is required for the embedding model and LLM to download on first run.
 
 **Google service account key:** Place your JSON key file anywhere inside `credentials/` (gitignored). Set `GOOGLE_SERVICE_ACCOUNT_KEY_PATH` to point to it, e.g. `./credentials/my-key.json`.
 
@@ -93,7 +90,6 @@ Add to your `claude_desktop_config.json`:
       "args": ["/path/to/kebo-mcp/dist/index.js"],
       "env": {
         "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/kebo_mcp",
-        "HF_TOKEN": "hf_your_token_here",
         "GOOGLE_SERVICE_ACCOUNT_KEY_PATH": "/path/to/kebo-mcp/credentials/your-key.json",
         "GOOGLE_DRIVE_FOLDER_ID": "your_folder_id"
       }
